@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Abendruhe – Schlafmeditation</title>
+
+    <!-- ===== PWA-VERKNÜPFUNGEN (NEU in dieser Version) ===== -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0e1f">
+
+    <!-- Apple/iPhone spezifisch -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Abendruhe">
+
+    <!-- Schriftart von Google laden -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
+
+    <style>
+        /* ============================================
+           1) FARBEN UND DESIGN-WERTE
+           ============================================ */
+        :root {
+            --bg-deep:    #0a0e1f;
+            --bg-mid:     #1a1c3a;
+            --bg-glow:    #2a2547;
+            --accent:     #d4a574;
+            --accent-soft:#e8c896;
+            --text:       #e8dcc4;
+            --text-dim:   #8a8299;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ============================================
+           2) GRUNDLEGENDES LAYOUT
+           ============================================ */
+        body {
+            font-family: 'Fraunces', serif;
+            background: var(--bg-deep);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2rem 1.5rem;
+            padding-top: max(2rem, env(safe-area-inset-top));
+            padding-bottom: max(2rem, env(safe-area-inset-bottom));
+            overflow: hidden;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 20% 0%, var(--bg-mid) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, var(--bg-glow) 0%, transparent 60%);
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(1px 1px at 20% 30%, var(--text), transparent),
+                radial-gradient(1px 1px at 60% 70%, var(--accent), transparent),
+                radial-gradient(1px 1px at 80% 20%, var(--text), transparent),
+                radial-gradient(1px 1px at 30% 85%, var(--accent-soft), transparent),
+                radial-gradient(1px 1px at 50% 50%, var(--text), transparent);
+            opacity: 0.4;
+            z-index: 0;
+        }
+
+        header, main, footer {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        /* ============================================
+           3) KOPF
+           ============================================ */
+        header h1 {
+            font-weight: 300;
+            font-size: clamp(1.75rem, 5vw, 2.5rem);
+            font-style: italic;
+            letter-spacing: 0.02em;
+        }
+        header p {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+
+        /* ============================================
+           4) ATEMKREIS
+           ============================================ */
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 2.5rem;
+        }
+
+        .breath-container {
+            width: min(280px, 70vw);
+            height: min(280px, 70vw);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .breath-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-soft) 0%, var(--accent) 50%, transparent 100%);
+            animation: breathe 8s ease-in-out infinite;
+        }
+        .breath-circle.outer { width: 100%; height: 100%; opacity: 0.10; }
+        .breath-circle.inner { width: 60%;  height: 60%;  opacity: 0.30; }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(0.85); }
+            50%      { transform: scale(1.15); }
+        }
+
+        body.paused .breath-circle { animation-play-state: paused; }
+
+        .breath-text {
+            position: relative;
+            z-index: 2;
+            font-style: italic;
+            font-weight: 300;
+            font-size: 1.25rem;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        body.active .breath-text { opacity: 1; }
+
+        /* ============================================
+           5) TIMER
+           ============================================ */
+        .timer {
+            font-size: 3rem;
+            font-weight: 300;
+            font-feature-settings: 'tnum';
+            letter-spacing: 0.05em;
+        }
+        .timer-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+        }
+
+        /* ============================================
+           6) STEUERUNG
+           ============================================ */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            width: 100%;
+        }
+
+        .duration-picker {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0.25rem;
+            border-radius: 999px;
+            border: 1px solid rgba(232, 220, 196, 0.1);
+        }
+        .duration-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-family: inherit;
+            font-size: 0.875rem;
+            padding: 0.5rem 1.25rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .duration-btn.active {
+            background: var(--accent);
+            color: var(--bg-deep);
+            font-weight: 500;
+        }
+
+        .start-btn {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--accent);
+            font-family: inherit;
+            font-size: 1rem;
+            font-style: italic;
+            padding: 1rem 3rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            letter-spacing: 0.05em;
+            min-width: 180px;
+        }
+        .start-btn:hover {
+            background: var(--accent);
+            color: var(--bg-deep);
+            box-shadow: 0 0 40px rgba(212, 165, 116, 0.3);
+        }
+
+        footer {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Abendruhe</h1>
+        <p>Schlafmeditation</p>
+    </header>
+
+    <main>
+        <div class="breath-container">
+            <div class="breath-circle outer"></div>
+            <div class="breath-circle inner"></div>
+            <div class="breath-text" id="breathText">Atme ein</div>
+        </div>
+
+        <div>
+            <div class="timer" id="timer">05:00</div>
+            <div class="timer-label">Verbleibend</div>
+        </div>
+
+        <div class="controls">
+            <div class="duration-picker">
+                <button class="duration-btn active" data-minutes="5">5 min</button>
+                <button class="duration-btn"        data-minutes="10">10 min</button>
+                <button class="duration-btn"        data-minutes="15">15 min</button>
+            </div>
+            <button class="start-btn" id="startBtn">Starten</button>
+        </div>
+    </main>
+
+    <footer>Gute Nacht</footer>
+
+    <script>
+    /* ================================================
+       JAVASCRIPT: macht die Seite interaktiv
+       ================================================ */
+
+    let totalSeconds = 5 * 60;
+    let secondsLeft  = totalSeconds;
+    let isRunning    = false;
+    let timerInterval  = null;
+    let breathInterval = null;
+
+    const timerEl      = document.getElementById('timer');
+    const startBtn     = document.getElementById('startBtn');
+    const breathTextEl = document.getElementById('breathText');
+    const durationBtns = document.querySelectorAll('.duration-btn');
+
+    function formatTime(s) {
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+    }
+    function updateTimer() { timerEl.textContent = formatTime(secondsLeft); }
+
+    let breathPhase = 0;
+    function toggleBreathText() {
+        breathPhase = (breathPhase + 1) % 2;
+        breathTextEl.textContent = breathPhase === 0 ? 'Atme ein' : 'Atme aus';
+    }
+
+    function start() {
+        isRunning = true;
+        startBtn.textContent = 'Pause';
+        document.body.classList.add('active');
+        document.body.classList.remove('paused');
+        breathInterval = setInterval(toggleBreathText, 4000);
+        timerInterval = setInterval(() => {
+            secondsLeft--;
+            updateTimer();
+            if (secondsLeft <= 0) finish();
+        }, 1000);
+    }
+
+    function pause() {
+        isRunning = false;
+        startBtn.textContent = 'Weiter';
+        document.body.classList.add('paused');
+        clearInterval(timerInterval);
+        clearInterval(breathInterval);
+    }
+
+    function finish() {
+        isRunning = false;
+        clearInterval(timerInterval);
+        clearInterval(breathInterval);
+        secondsLeft = totalSeconds;
+        updateTimer();
+        startBtn.textContent = 'Starten';
+        document.body.classList.remove('active', 'paused');
+        breathTextEl.textContent = 'Atme ein';
+        playChime();
+    }
+
+    function playChime() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = 528;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.3);
+            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 3);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 3);
+        } catch (e) { /* Audio nicht verfügbar – egal */ }
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (isRunning) pause(); else start();
+    });
+
+    durationBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (isRunning) return;
+            durationBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            totalSeconds = parseInt(btn.dataset.minutes) * 60;
+            secondsLeft  = totalSeconds;
+            updateTimer();
+        });
+    });
+
+    updateTimer();
+
+    /* ================================================
+       SERVICE WORKER REGISTRIEREN (NEU)
+       Aktiviert Offline-Funktion und PWA-Installation
+       ================================================ */
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker registriert', reg.scope))
+                .catch(err => console.log('Service Worker Fehler', err));
+        });
+    }
+    </script>
+</body>
+</html>
