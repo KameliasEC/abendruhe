@@ -3,7 +3,7 @@
    Sorgt dafür, dass die App auch offline läuft.
    ============================================ */
 
-const CACHE_NAME = 'abendruhe-v1';
+const CACHE_NAME = 'abendruhe-v2';
 
 // Diese Dateien werden beim ersten Besuch lokal gespeichert
 const FILES_TO_CACHE = [
@@ -42,6 +42,47 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         caches.match(event.request).then((response) => {
             return response || fetch(event.request);
+        })
+    );
+});
+
+/* ============================================
+   PUSH-NOTIFICATIONS (NEU)
+   ============================================ */
+
+// 4) Push-Nachricht empfangen → Notification anzeigen
+self.addEventListener('push', (event) => {
+    let data = {
+        title: 'Abendruhe',
+        body: 'Zeit für deine Schlafmeditation 🌙',
+        url: './'
+    };
+    if (event.data) {
+        try { data = { ...data, ...event.data.json() }; } catch (e) {}
+    }
+    event.waitUntil(
+        self.registration.showNotification(data.title, {
+            body: data.body,
+            icon: 'icon-192.png',
+            badge: 'icon-192.png',
+            tag: 'abendruhe-reminder',
+            data: { url: data.url }
+        })
+    );
+});
+
+// 5) Klick auf die Notification → App öffnen
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || './';
+    event.waitUntil(
+        clients.matchAll({ type: 'window' }).then((wins) => {
+            // Wenn die App schon offen ist: dahin wechseln
+            for (const w of wins) {
+                if (w.url.includes(url) && 'focus' in w) return w.focus();
+            }
+            // Sonst neu öffnen
+            if (clients.openWindow) return clients.openWindow(url);
         })
     );
 });

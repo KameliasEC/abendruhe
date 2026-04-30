@@ -233,6 +233,83 @@
             letter-spacing: 0.2em;
             text-transform: uppercase;
         }
+
+        /* ============================================
+           7) ERINNERUNG (NEU)
+           ============================================ */
+        .reminder {
+            width: 100%;
+            margin-top: 1.5rem;
+            padding: 1.25rem 1.5rem;
+            border: 1px solid rgba(232, 220, 196, 0.08);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .reminder h2 {
+            font-size: 0.7rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+        .reminder-status {
+            font-size: 0.95rem;
+            color: var(--text);
+            margin-bottom: 1rem;
+            font-style: italic;
+            font-weight: 300;
+        }
+        .reminder-btn {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid rgba(232, 220, 196, 0.25);
+            font-family: inherit;
+            font-size: 0.875rem;
+            padding: 0.5rem 1.5rem;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .reminder-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .subscription-output {
+            margin-top: 1.25rem;
+            text-align: left;
+        }
+        .subscription-output > p {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+        .subscription-output textarea {
+            width: 100%;
+            height: 110px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(232, 220, 196, 0.1);
+            border-radius: 0.5rem;
+            color: var(--text);
+            font-family: ui-monospace, monospace;
+            font-size: 0.7rem;
+            padding: 0.75rem;
+            resize: none;
+            line-height: 1.4;
+        }
+        .copy-btn {
+            margin-top: 0.5rem;
+            background: transparent;
+            color: var(--text-dim);
+            border: none;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 0.25rem 0;
+            font-style: italic;
+        }
+        .copy-btn:hover { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -261,6 +338,19 @@
             </div>
             <button class="start-btn" id="startBtn">Starten</button>
         </div>
+
+        <!-- ===== ERINNERUNG (NEU) ===== -->
+        <section class="reminder">
+            <h2>Tägliche Erinnerung</h2>
+            <p class="reminder-status" id="reminderStatus">Wird geladen…</p>
+            <button class="reminder-btn" id="reminderBtn" hidden>Erinnerung aktivieren</button>
+
+            <div class="subscription-output" id="subscriptionOutput" hidden>
+                <p>Kopiere diesen Code – wir brauchen ihn gleich in Phase B (GitHub Secrets).</p>
+                <textarea readonly id="subscriptionJson"></textarea>
+                <button class="copy-btn" id="copyBtn">Kopieren</button>
+            </div>
+        </section>
     </main>
 
     <footer>Gute Nacht</footer>
@@ -361,8 +451,107 @@
     updateTimer();
 
     /* ================================================
-       SERVICE WORKER REGISTRIEREN (NEU)
-       Aktiviert Offline-Funktion und PWA-Installation
+       PUSH-NOTIFICATIONS: Subscription verwalten (NEU)
+       ================================================ */
+
+    // Dein VAPID Public Key – passt zum Private Key in GitHub Secrets
+    const VAPID_PUBLIC_KEY = 'BMJ8kQA_K-REFsZVlOlfluX3cF9hHoRB4f8xeCrIbQ3gnMHOxAiDwTNGwHl-a9rPyfsauyNFzhtVmOy8EBQsEDM';
+
+    // Hilfsfunktion: Base64-URL → Uint8Array (was die Push-API will)
+    function urlBase64ToUint8Array(base64) {
+        const padding = '='.repeat((4 - base64.length % 4) % 4);
+        const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const raw = atob(b64);
+        return Uint8Array.from(raw, c => c.charCodeAt(0));
+    }
+
+    const reminderBtn        = document.getElementById('reminderBtn');
+    const reminderStatus     = document.getElementById('reminderStatus');
+    const subscriptionOutput = document.getElementById('subscriptionOutput');
+    const subscriptionJson   = document.getElementById('subscriptionJson');
+    const copyBtn            = document.getElementById('copyBtn');
+
+    async function getCurrentSubscription() {
+        const reg = await navigator.serviceWorker.ready;
+        return await reg.pushManager.getSubscription();
+    }
+
+    async function updateReminderUI() {
+        // Browser-Support checken
+        if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+            reminderStatus.textContent = 'Push wird von diesem Browser nicht unterstützt';
+            return;
+        }
+        // iOS verlangt Installation auf Homescreen
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        if (isIOS && !isStandalone) {
+            reminderStatus.textContent = 'Auf iPhone: erst zum Home-Bildschirm hinzufügen, dann hier öffnen';
+            return;
+        }
+        if (Notification.permission === 'denied') {
+            reminderStatus.textContent = 'Notifications sind blockiert (in den Browser-Einstellungen erlauben)';
+            return;
+        }
+
+        const sub = await getCurrentSubscription();
+        reminderBtn.hidden = false;
+        if (sub) {
+            reminderStatus.textContent = '✓ Aktiv';
+            reminderBtn.textContent = 'Deaktivieren';
+            subscriptionOutput.hidden = false;
+            subscriptionJson.value = JSON.stringify(sub.toJSON(), null, 2);
+        } else {
+            reminderStatus.textContent = 'Noch nicht aktiv';
+            reminderBtn.textContent = 'Erinnerung aktivieren';
+            subscriptionOutput.hidden = true;
+        }
+    }
+
+    reminderBtn.addEventListener('click', async () => {
+        try {
+            const sub = await getCurrentSubscription();
+            if (sub) {
+                await sub.unsubscribe();
+            } else {
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    reminderStatus.textContent = 'Du musst Notifications erlauben';
+                    return;
+                }
+                const reg = await navigator.serviceWorker.ready;
+                await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+            }
+        } catch (err) {
+            reminderStatus.textContent = 'Fehler: ' + err.message;
+            return;
+        }
+        updateReminderUI();
+    });
+
+    copyBtn.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(subscriptionJson.value);
+            copyBtn.textContent = '✓ Kopiert';
+            setTimeout(() => copyBtn.textContent = 'Kopieren', 2000);
+        } catch (e) {
+            // Fallback: Textarea selektieren
+            subscriptionJson.select();
+        }
+    });
+
+    // Beim Laden den Status checken
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(updateReminderUI);
+    } else {
+        updateReminderUI();
+    }
+
+    /* ================================================
+       SERVICE WORKER REGISTRIEREN
        ================================================ */
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
