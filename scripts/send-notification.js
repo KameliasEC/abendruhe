@@ -14,7 +14,7 @@ const APP_URL             = process.env.APP_URL || 'https://kameliasec.github.io
 const CONTACT_EMAIL       = process.env.CONTACT_EMAIL || 'mailto:noreply@example.com';
 
 // Wie viele Minuten +/- der User-Zeit wir akzeptieren (Cron läuft alle 15 min)
-const WINDOW_MINUTES = 8;
+const WINDOW_MINUTES = 15;
 // Wie lange nach dem letzten Senden wir nicht nochmal senden (verhindert Duplikate)
 const COOLDOWN_HOURS = 12;
 
