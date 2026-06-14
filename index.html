@@ -450,6 +450,10 @@
         return await reg.pushManager.getSubscription();
     }
 
+    // Merkt sich, ob der User gerade frisch subscribt hat – dann zeigen wir den Code.
+    // Bei normaler App-Nutzung bleibt der versteckt.
+    let justSubscribed = false;
+
     async function updateReminderUI() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
             reminderStatus.textContent = 'Push wird von diesem Browser nicht unterstützt';
@@ -471,12 +475,14 @@
         if (sub) {
             reminderStatus.textContent = '✓ Aktiv';
             reminderBtn.textContent = 'Deaktivieren';
-            subscriptionOutput.hidden = false;
             subscriptionJson.value = JSON.stringify(sub.toJSON(), null, 2);
+            // Nur direkt nach dem Subscriben anzeigen, danach verstecken
+            subscriptionOutput.hidden = !justSubscribed;
         } else {
             reminderStatus.textContent = 'Noch nicht aktiv';
             reminderBtn.textContent = 'Erinnerung aktivieren';
             subscriptionOutput.hidden = true;
+            justSubscribed = false;
         }
     }
 
@@ -496,6 +502,7 @@
                     userVisibleOnly: true,
                     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
                 });
+                justSubscribed = true;
             }
         } catch (err) {
             reminderStatus.textContent = 'Fehler: ' + err.message;

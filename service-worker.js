@@ -4,7 +4,7 @@
    und Push-Notifications empfängt.
    ============================================ */
 
-const CACHE_NAME = 'abendruhe-v3';
+const CACHE_NAME = 'abendruhe-v4';
 
 // Diese Dateien werden beim ersten Besuch lokal gespeichert
 const FILES_TO_CACHE = [
