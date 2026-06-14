@@ -17,6 +17,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
 
+    <!-- Supabase JS Library (für Multi-User Datenbank) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         :root {
             --bg-deep:    #0a0e1f;
@@ -266,6 +269,44 @@
             font-style: italic;
         }
         .copy-btn:hover { color: var(--accent); }
+
+        /* Zeit-Picker für die Erinnerung */
+        .time-picker-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+            color: var(--text);
+            font-style: italic;
+            font-weight: 300;
+        }
+        input[type="time"] {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(232, 220, 196, 0.2);
+            border-radius: 0.5rem;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 1.05rem;
+            padding: 0.4rem 0.75rem;
+            font-feature-settings: 'tnum';
+            color-scheme: dark;
+        }
+        input[type="time"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .save-feedback {
+            font-size: 0.75rem;
+            color: var(--accent);
+            font-style: italic;
+            margin-bottom: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            height: 1em;
+        }
+        .save-feedback.visible { opacity: 1; }
     </style>
 </head>
 <body>
@@ -293,13 +334,15 @@
         <section class="reminder">
             <h2>Tägliche Erinnerung</h2>
             <p class="reminder-status" id="reminderStatus">Wird geladen…</p>
-            <button class="reminder-btn" id="reminderBtn" hidden>Erinnerung aktivieren</button>
 
-            <div class="subscription-output" id="subscriptionOutput" hidden>
-                <p>Subscription-Code für GitHub Secrets:</p>
-                <textarea readonly id="subscriptionJson"></textarea>
-                <button class="copy-btn" id="copyBtn">Kopieren</button>
+            <div class="time-picker-row" id="timePickerRow" hidden>
+                <label for="reminderTime">Um</label>
+                <input type="time" id="reminderTime" value="22:00">
             </div>
+
+            <p class="save-feedback" id="saveFeedback">✓ Gespeichert</p>
+
+            <button class="reminder-btn" id="reminderBtn" hidden>Erinnerung aktivieren</button>
         </section>
     </main>
 
@@ -430,8 +473,15 @@
        PUSH-NOTIFICATIONS: Subscription verwalten
        ================================================ */
 
+    // VAPID Public Key (muss zum Private Key in den GitHub-Secrets passen)
     const VAPID_PUBLIC_KEY = 'BMJ8kQA_K-REFsZVlOlfluX3cF9hHoRB4f8xeCrIbQ3gnMHOxAiDwTNGwHl-a9rPyfsauyNFzhtVmOy8EBQsEDM';
 
+    // Supabase-Konfiguration (Publishable Key ist designed um öffentlich zu sein)
+    const SUPABASE_URL = 'https://cwijrgutwwctcomvnkkp.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_VLi4gVepW0HnHUrvr9elmQ_8H5_5Jwo';
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Hilfsfunktion: Base64-URL → Uint8Array (was die Push-API will)
     function urlBase64ToUint8Array(base64) {
         const padding = '='.repeat((4 - base64.length % 4) % 4);
         const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -439,26 +489,41 @@
         return Uint8Array.from(raw, c => c.charCodeAt(0));
     }
 
-    const reminderBtn        = document.getElementById('reminderBtn');
-    const reminderStatus     = document.getElementById('reminderStatus');
-    const subscriptionOutput = document.getElementById('subscriptionOutput');
-    const subscriptionJson   = document.getElementById('subscriptionJson');
-    const copyBtn            = document.getElementById('copyBtn');
+    const reminderBtn    = document.getElementById('reminderBtn');
+    const reminderStatus = document.getElementById('reminderStatus');
+    const timePickerRow  = document.getElementById('timePickerRow');
+    const reminderTime   = document.getElementById('reminderTime');
+    const saveFeedback   = document.getElementById('saveFeedback');
+
+    // Letzte gewählte Zeit aus dem Browser-Speicher holen (oder Standard 22:00)
+    const savedTime = localStorage.getItem('reminderTime') || '22:00';
+    reminderTime.value = savedTime;
+
+    function showFeedback(text, isError) {
+        saveFeedback.textContent = text;
+        saveFeedback.style.color = isError ? '#ff8080' : 'var(--accent)';
+        saveFeedback.classList.add('visible');
+        clearTimeout(showFeedback.timeout);
+        showFeedback.timeout = setTimeout(() => saveFeedback.classList.remove('visible'), 2500);
+    }
 
     async function getCurrentSubscription() {
         const reg = await navigator.serviceWorker.ready;
         return await reg.pushManager.getSubscription();
     }
 
-    // Merkt sich, ob der User gerade frisch subscribt hat – dann zeigen wir den Code.
-    // Bei normaler App-Nutzung bleibt der versteckt.
-    let justSubscribed = false;
+    function parseTime(value) {
+        const [h, m] = value.split(':').map(Number);
+        return { hour: h, minute: m };
+    }
 
     async function updateReminderUI() {
+        // Browser-Support checken
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
             reminderStatus.textContent = 'Push wird von diesem Browser nicht unterstützt';
             return;
         }
+        // iOS verlangt Installation auf Homescreen
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
         if (isIOS && !isStandalone) {
@@ -472,53 +537,121 @@
 
         const sub = await getCurrentSubscription();
         reminderBtn.hidden = false;
+        timePickerRow.hidden = false;
+
         if (sub) {
-            reminderStatus.textContent = '✓ Aktiv';
+            reminderStatus.textContent = '✓ Aktiv um ' + reminderTime.value;
             reminderBtn.textContent = 'Deaktivieren';
-            subscriptionJson.value = JSON.stringify(sub.toJSON(), null, 2);
-            // Nur direkt nach dem Subscriben anzeigen, danach verstecken
-            subscriptionOutput.hidden = !justSubscribed;
         } else {
             reminderStatus.textContent = 'Noch nicht aktiv';
             reminderBtn.textContent = 'Erinnerung aktivieren';
-            subscriptionOutput.hidden = true;
-            justSubscribed = false;
         }
     }
 
-    reminderBtn.addEventListener('click', async () => {
-        try {
-            const sub = await getCurrentSubscription();
-            if (sub) {
-                await sub.unsubscribe();
-            } else {
-                const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    reminderStatus.textContent = 'Du musst Notifications erlauben';
-                    return;
-                }
-                const reg = await navigator.serviceWorker.ready;
-                await reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-                });
-                justSubscribed = true;
-            }
-        } catch (err) {
-            reminderStatus.textContent = 'Fehler: ' + err.message;
+    async function subscribe() {
+        // 1) Notification-Erlaubnis holen
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            reminderStatus.textContent = 'Du musst Notifications erlauben';
             return;
         }
+
+        // 2) Beim Push-Service subscriben
+        const reg = await navigator.serviceWorker.ready;
+        const pushSub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        // 3) In Supabase speichern (mit Zeit + Zeitzone)
+        const subData = pushSub.toJSON();
+        const { hour, minute } = parseTime(reminderTime.value);
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const { error } = await db
+            .from('subscriptions')
+            .upsert({
+                endpoint:        subData.endpoint,
+                p256dh:          subData.keys.p256dh,
+                auth:            subData.keys.auth,
+                reminder_hour:   hour,
+                reminder_minute: minute,
+                timezone:        timezone
+            }, { onConflict: 'endpoint' });
+
+        if (error) {
+            console.error('Supabase Fehler:', error);
+            // Rollback: Push-Subscription wieder aufheben
+            await pushSub.unsubscribe();
+            showFeedback('Fehler beim Speichern: ' + error.message, true);
+            return;
+        }
+
+        localStorage.setItem('reminderTime', reminderTime.value);
+        showFeedback('✓ Erinnerung aktiviert');
+    }
+
+    async function unsubscribe() {
+        const pushSub = await getCurrentSubscription();
+        if (!pushSub) return;
+
+        // Erst aus Supabase löschen
+        const { error } = await db
+            .from('subscriptions')
+            .delete()
+            .eq('endpoint', pushSub.endpoint);
+
+        if (error) {
+            console.warn('Supabase Lösch-Fehler (ignoriert):', error);
+            // Weiter machen – User will unsubscriben, egal ob DB klappt
+        }
+
+        // Dann beim Push-Service unsubscriben
+        await pushSub.unsubscribe();
+        showFeedback('Erinnerung deaktiviert');
+    }
+
+    async function updateTime(newTime) {
+        const sub = await getCurrentSubscription();
+        if (!sub) {
+            // Nicht subscribed → nur lokal merken
+            localStorage.setItem('reminderTime', newTime);
+            return;
+        }
+
+        const { hour, minute } = parseTime(newTime);
+        const { error } = await db
+            .from('subscriptions')
+            .update({ reminder_hour: hour, reminder_minute: minute })
+            .eq('endpoint', sub.endpoint);
+
+        if (error) {
+            console.error('Update-Fehler:', error);
+            showFeedback('Zeit nicht gespeichert: ' + error.message, true);
+            return;
+        }
+
+        localStorage.setItem('reminderTime', newTime);
+        showFeedback('✓ Zeit aktualisiert');
+    }
+
+    reminderBtn.addEventListener('click', async () => {
+        reminderBtn.disabled = true;
+        try {
+            const sub = await getCurrentSubscription();
+            if (sub) await unsubscribe();
+            else     await subscribe();
+        } catch (err) {
+            console.error(err);
+            showFeedback('Fehler: ' + err.message, true);
+        }
+        reminderBtn.disabled = false;
         updateReminderUI();
     });
 
-    copyBtn.addEventListener('click', async () => {
-        try {
-            await navigator.clipboard.writeText(subscriptionJson.value);
-            copyBtn.textContent = '✓ Kopiert';
-            setTimeout(() => copyBtn.textContent = 'Kopieren', 2000);
-        } catch (e) {
-            subscriptionJson.select();
-        }
+    reminderTime.addEventListener('change', async () => {
+        await updateTime(reminderTime.value);
+        updateReminderUI();
     });
 
     if ('serviceWorker' in navigator) {
