@@ -1,14 +1,12 @@
 name: Abendliche Erinnerung
 
 on:
-  # Manuell auslösbar zum Testen (Button "Run workflow" in der Actions-UI)
+  # Manuell auslösbar zum Testen
   workflow_dispatch:
 
-  # Automatisch nach Zeitplan (UTC!)
-  # 20:00 UTC = 22:00 Hamburg im Sommer / 21:00 Hamburg im Winter
-  # Zum Ändern: cron-Wert anpassen ("Minute Stunde * * *")
+  # Alle 15 Minuten – jeder Lauf prüft, welche User gerade dran sind
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '*/15 * * * *'
 
 jobs:
   send-reminder:
@@ -22,14 +20,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: web-push Library installieren
+      - name: Libraries installieren
         working-directory: ./scripts
         run: npm install --silent
 
-      - name: Notification senden
+      - name: Notifications senden
         working-directory: ./scripts
         env:
-          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          VAPID_PUBLIC_KEY:    ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY:   ${{ secrets.VAPID_PRIVATE_KEY }}
+          SUPABASE_URL:        ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: node send-notification.js
