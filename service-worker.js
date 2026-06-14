@@ -1,9 +1,10 @@
 /* ============================================
    SERVICE WORKER für Abendruhe
-   Sorgt dafür, dass die App auch offline läuft.
+   Sorgt dafür, dass die App auch offline läuft
+   und Push-Notifications empfängt.
    ============================================ */
 
-const CACHE_NAME = 'abendruhe-v2';
+const CACHE_NAME = 'abendruhe-v3';
 
 // Diese Dateien werden beim ersten Besuch lokal gespeichert
 const FILES_TO_CACHE = [
@@ -11,7 +12,8 @@ const FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
     './icon-192.png',
-    './icon-512.png'
+    './icon-512.png',
+    './audio/meditation.m4a'
 ];
 
 // 1) Bei der Installation: Dateien herunterladen und speichern
@@ -47,7 +49,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 /* ============================================
-   PUSH-NOTIFICATIONS (NEU)
+   PUSH-NOTIFICATIONS
    ============================================ */
 
 // 4) Push-Nachricht empfangen → Notification anzeigen
@@ -77,11 +79,9 @@ self.addEventListener('notificationclick', (event) => {
     const url = event.notification.data?.url || './';
     event.waitUntil(
         clients.matchAll({ type: 'window' }).then((wins) => {
-            // Wenn die App schon offen ist: dahin wechseln
             for (const w of wins) {
                 if (w.url.includes(url) && 'focus' in w) return w.focus();
             }
-            // Sonst neu öffnen
             if (clients.openWindow) return clients.openWindow(url);
         })
     );
