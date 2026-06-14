@@ -5,25 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Abendruhe – Schlafmeditation</title>
 
-    <!-- ===== PWA-VERKNÜPFUNGEN (NEU in dieser Version) ===== -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0e1f">
 
-    <!-- Apple/iPhone spezifisch -->
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Abendruhe">
 
-    <!-- Schriftart von Google laden -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
 
     <style>
-        /* ============================================
-           1) FARBEN UND DESIGN-WERTE
-           ============================================ */
         :root {
             --bg-deep:    #0a0e1f;
             --bg-mid:     #1a1c3a;
@@ -36,9 +30,6 @@
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* ============================================
-           2) GRUNDLEGENDES LAYOUT
-           ============================================ */
         body {
             font-family: 'Fraunces', serif;
             background: var(--bg-deep);
@@ -89,9 +80,6 @@
             text-align: center;
         }
 
-        /* ============================================
-           3) KOPF
-           ============================================ */
         header h1 {
             font-weight: 300;
             font-size: clamp(1.75rem, 5vw, 2.5rem);
@@ -106,9 +94,6 @@
             margin-top: 0.5rem;
         }
 
-        /* ============================================
-           4) ATEMKREIS
-           ============================================ */
         main {
             display: flex;
             flex-direction: column;
@@ -154,9 +139,6 @@
         }
         body.active .breath-text { opacity: 1; }
 
-        /* ============================================
-           5) TIMER
-           ============================================ */
         .timer {
             font-size: 3rem;
             font-weight: 300;
@@ -171,40 +153,12 @@
             margin-top: 0.5rem;
         }
 
-        /* ============================================
-           6) STEUERUNG
-           ============================================ */
         .controls {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 1.5rem;
             width: 100%;
-        }
-
-        .duration-picker {
-            display: flex;
-            gap: 0.25rem;
-            background: rgba(255, 255, 255, 0.04);
-            padding: 0.25rem;
-            border-radius: 999px;
-            border: 1px solid rgba(232, 220, 196, 0.1);
-        }
-        .duration-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-dim);
-            font-family: inherit;
-            font-size: 0.875rem;
-            padding: 0.5rem 1.25rem;
-            border-radius: 999px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .duration-btn.active {
-            background: var(--accent);
-            color: var(--bg-deep);
-            font-weight: 500;
         }
 
         .start-btn {
@@ -226,6 +180,10 @@
             color: var(--bg-deep);
             box-shadow: 0 0 40px rgba(212, 165, 116, 0.3);
         }
+        .start-btn:disabled {
+            opacity: 0.4;
+            cursor: wait;
+        }
 
         footer {
             font-size: 0.7rem;
@@ -234,9 +192,7 @@
             text-transform: uppercase;
         }
 
-        /* ============================================
-           7) ERINNERUNG (NEU)
-           ============================================ */
+        /* Erinnerungs-Sektion */
         .reminder {
             width: 100%;
             margin-top: 1.5rem;
@@ -326,27 +282,21 @@
         </div>
 
         <div>
-            <div class="timer" id="timer">05:00</div>
+            <div class="timer" id="timer">--:--</div>
             <div class="timer-label">Verbleibend</div>
         </div>
 
         <div class="controls">
-            <div class="duration-picker">
-                <button class="duration-btn active" data-minutes="5">5 min</button>
-                <button class="duration-btn"        data-minutes="10">10 min</button>
-                <button class="duration-btn"        data-minutes="15">15 min</button>
-            </div>
-            <button class="start-btn" id="startBtn">Starten</button>
+            <button class="start-btn" id="startBtn" disabled>Lädt…</button>
         </div>
 
-        <!-- ===== ERINNERUNG (NEU) ===== -->
         <section class="reminder">
             <h2>Tägliche Erinnerung</h2>
             <p class="reminder-status" id="reminderStatus">Wird geladen…</p>
             <button class="reminder-btn" id="reminderBtn" hidden>Erinnerung aktivieren</button>
 
             <div class="subscription-output" id="subscriptionOutput" hidden>
-                <p>Kopiere diesen Code – wir brauchen ihn gleich in Phase B (GitHub Secrets).</p>
+                <p>Subscription-Code für GitHub Secrets:</p>
                 <textarea readonly id="subscriptionJson"></textarea>
                 <button class="copy-btn" id="copyBtn">Kopieren</button>
             </div>
@@ -355,28 +305,54 @@
 
     <footer>Gute Nacht</footer>
 
+    <!-- Audio-Element: das Meditations-Audio (im Hintergrund, nicht sichtbar) -->
+    <audio id="meditationAudio" preload="auto" src="audio/meditation.m4a"></audio>
+
     <script>
     /* ================================================
-       JAVASCRIPT: macht die Seite interaktiv
+       MEDITATIONS-PLAYBACK (mit Audio)
        ================================================ */
 
-    let totalSeconds = 5 * 60;
-    let secondsLeft  = totalSeconds;
-    let isRunning    = false;
-    let timerInterval  = null;
-    let breathInterval = null;
-
+    const audio        = document.getElementById('meditationAudio');
     const timerEl      = document.getElementById('timer');
     const startBtn     = document.getElementById('startBtn');
     const breathTextEl = document.getElementById('breathText');
-    const durationBtns = document.querySelectorAll('.duration-btn');
+
+    let isRunning      = false;
+    let breathInterval = null;
 
     function formatTime(s) {
         const m = Math.floor(s / 60);
-        const r = s % 60;
+        const r = Math.floor(s % 60);
         return String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
     }
-    function updateTimer() { timerEl.textContent = formatTime(secondsLeft); }
+    function updateTimer(seconds) {
+        timerEl.textContent = formatTime(seconds);
+    }
+
+    // Wenn Audio-Metadaten geladen: Länge im Timer anzeigen, Button aktivieren
+    audio.addEventListener('loadedmetadata', () => {
+        updateTimer(audio.duration);
+        startBtn.textContent = 'Starten';
+        startBtn.disabled = false;
+    });
+
+    // Timer ständig aktualisieren während Audio läuft
+    audio.addEventListener('timeupdate', () => {
+        if (!isFinite(audio.duration)) return;
+        updateTimer(audio.duration - audio.currentTime);
+    });
+
+    // Audio zu Ende → Meditation abschließen
+    audio.addEventListener('ended', () => {
+        finish();
+    });
+
+    // Falls Audio nicht lädt: Fehler zeigen statt ewig "Lädt…"
+    audio.addEventListener('error', () => {
+        startBtn.textContent = 'Audio nicht verfügbar';
+        startBtn.disabled = true;
+    });
 
     let breathPhase = 0;
     function toggleBreathText() {
@@ -389,31 +365,28 @@
         startBtn.textContent = 'Pause';
         document.body.classList.add('active');
         document.body.classList.remove('paused');
+        audio.play().catch(err => console.log('Audio-Start fehlgeschlagen:', err));
         breathInterval = setInterval(toggleBreathText, 4000);
-        timerInterval = setInterval(() => {
-            secondsLeft--;
-            updateTimer();
-            if (secondsLeft <= 0) finish();
-        }, 1000);
     }
 
     function pause() {
         isRunning = false;
         startBtn.textContent = 'Weiter';
         document.body.classList.add('paused');
-        clearInterval(timerInterval);
+        audio.pause();
         clearInterval(breathInterval);
     }
 
     function finish() {
         isRunning = false;
-        clearInterval(timerInterval);
-        clearInterval(breathInterval);
-        secondsLeft = totalSeconds;
-        updateTimer();
+        audio.pause();
+        audio.currentTime = 0;
+        updateTimer(audio.duration);
         startBtn.textContent = 'Starten';
         document.body.classList.remove('active', 'paused');
         breathTextEl.textContent = 'Atme ein';
+        breathPhase = 0;
+        clearInterval(breathInterval);
         playChime();
     }
 
@@ -430,34 +403,35 @@
             osc.connect(gain).connect(ctx.destination);
             osc.start();
             osc.stop(ctx.currentTime + 3);
-        } catch (e) { /* Audio nicht verfügbar – egal */ }
+        } catch (e) {}
     }
 
     startBtn.addEventListener('click', () => {
         if (isRunning) pause(); else start();
     });
 
-    durationBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (isRunning) return;
-            durationBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            totalSeconds = parseInt(btn.dataset.minutes) * 60;
-            secondsLeft  = totalSeconds;
-            updateTimer();
+    /* ================================================
+       MEDIA SESSION API: Lockscreen-Steuerung auf iPhone
+       ================================================ */
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Schlafmeditation',
+            artist: 'Abendruhe',
+            artwork: [
+                { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
+            ]
         });
-    });
-
-    updateTimer();
+        navigator.mediaSession.setActionHandler('play',  () => { if (!isRunning) start(); });
+        navigator.mediaSession.setActionHandler('pause', () => { if (isRunning) pause(); });
+    }
 
     /* ================================================
-       PUSH-NOTIFICATIONS: Subscription verwalten (NEU)
+       PUSH-NOTIFICATIONS: Subscription verwalten
        ================================================ */
 
-    // Dein VAPID Public Key – passt zum Private Key in GitHub Secrets
     const VAPID_PUBLIC_KEY = 'BMJ8kQA_K-REFsZVlOlfluX3cF9hHoRB4f8xeCrIbQ3gnMHOxAiDwTNGwHl-a9rPyfsauyNFzhtVmOy8EBQsEDM';
 
-    // Hilfsfunktion: Base64-URL → Uint8Array (was die Push-API will)
     function urlBase64ToUint8Array(base64) {
         const padding = '='.repeat((4 - base64.length % 4) % 4);
         const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -477,12 +451,10 @@
     }
 
     async function updateReminderUI() {
-        // Browser-Support checken
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
             reminderStatus.textContent = 'Push wird von diesem Browser nicht unterstützt';
             return;
         }
-        // iOS verlangt Installation auf Homescreen
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
         if (isIOS && !isStandalone) {
@@ -538,12 +510,10 @@
             copyBtn.textContent = '✓ Kopiert';
             setTimeout(() => copyBtn.textContent = 'Kopieren', 2000);
         } catch (e) {
-            // Fallback: Textarea selektieren
             subscriptionJson.select();
         }
     });
 
-    // Beim Laden den Status checken
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(updateReminderUI);
     } else {
