@@ -1,10 +1,11 @@
 {
   "name": "abendruhe-scripts",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Sendet die abendliche Erinnerung für Abendruhe",
+  "description": "Multi-User Notification-Sender für Abendruhe",
   "main": "send-notification.js",
   "dependencies": {
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
