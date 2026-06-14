@@ -1,0 +1,10 @@
+{
+  "name": "abendruhe-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sendet die abendliche Erinnerung für Abendruhe",
+  "main": "send-notification.js",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}
