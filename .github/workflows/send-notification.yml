@@ -1,0 +1,35 @@
+name: Abendliche Erinnerung
+
+on:
+  # Manuell auslösbar zum Testen (Button "Run workflow" in der Actions-UI)
+  workflow_dispatch:
+
+  # Automatisch nach Zeitplan (UTC!)
+  # 20:00 UTC = 22:00 Hamburg im Sommer / 21:00 Hamburg im Winter
+  # Zum Ändern: cron-Wert anpassen ("Minute Stunde * * *")
+  schedule:
+    - cron: '0 20 * * *'
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: web-push Library installieren
+        working-directory: ./scripts
+        run: npm install --silent
+
+      - name: Notification senden
+        working-directory: ./scripts
+        env:
+          VAPID_PUBLIC_KEY:  ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+        run: node send-notification.js
