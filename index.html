@@ -270,6 +270,18 @@
         }
         .copy-btn:hover { color: var(--accent); }
 
+        /* Datenschutz-Hinweis */
+        .reminder-note {
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(232, 220, 196, 0.06);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            line-height: 1.55;
+            text-align: center;
+            font-style: italic;
+        }
+
         /* Zeit-Picker für die Erinnerung */
         .time-picker-row {
             display: flex;
@@ -343,6 +355,12 @@
             <p class="save-feedback" id="saveFeedback">✓ Gespeichert</p>
 
             <button class="reminder-btn" id="reminderBtn" hidden>Erinnerung aktivieren</button>
+
+            <p class="reminder-note">
+                Wir speichern nur deine Wunsch-Zeit und die technische Push-Adresse deines Browsers.
+                Daten liegen in Supabase (Frankfurt, EU). Beim Deaktivieren wird alles gelöscht.
+                Kein Tracking, keine Werbung.
+            </p>
         </section>
     </main>
 
