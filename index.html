@@ -622,7 +622,11 @@
         const { hour, minute } = parseTime(newTime);
         const { error } = await db
             .from('subscriptions')
-            .update({ reminder_hour: hour, reminder_minute: minute })
+            .update({
+                reminder_hour: hour,
+                reminder_minute: minute,
+                last_sent_at: null
+            })
             .eq('endpoint', sub.endpoint);
 
         if (error) {
